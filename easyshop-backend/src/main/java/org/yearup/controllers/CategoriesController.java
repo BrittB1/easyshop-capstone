@@ -8,11 +8,9 @@ import org.yearup.data.ProductDao;
 import org.yearup.models.Category;
 import org.yearup.models.Product;
 
-import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
-// http://localhost:8080/categories
-// add annotation to allow cross site origin requests
 @RestController
 @RequestMapping("/categories")
 @CrossOrigin
@@ -25,30 +23,29 @@ public class CategoriesController {
 
     // add the appropriate annotation for a get action
     @GetMapping
-    public @ResponseBody List<Category> getAll() {
 
-//
-//        }
-        //  ]
-        return categoryDao.getAllCategories();
+    // @ResponseBody tells Spring to convert the returned list into JSON
+    public @ResponseBody List<Category> getAll() {
+        try {
+            List<Category> categories = categoryDao.getAllCategories();
+
+            if (categories == null) {
+                return new ArrayList<>();
+            }
+            return categories;
+
+        } catch (Exception e) {
+            System.out.println("Error getting categories: " + e.getMessage());
+            throw e;
+        }
     }
 
-    // add the appropriate annotation for a get action
-    // http://localhost:8080/categories/1
     @GetMapping("/{id}")
     public Category getById(@PathVariable int id) {
-        // get the category by id
-        //    {
-//        categoryId: 1,
-//        name: "Name",
-//        description: "Description"
-//
-//    }
+
         return categoryDao.getById(id);
     }
 
-    // the url to return all products in category 1 would look like this
-    // https://localhost:8080/categories/1/products
     @GetMapping("/{categoryId}/products")
     public List<Product> getProductsById(@PathVariable int categoryId) {
 
@@ -68,21 +65,40 @@ public class CategoriesController {
         return categoryDao.create(category);
     }
 
-    // TODO add annotation to call this method for a PUT (update) action - the url path must include the categoryId
-    // TODO add annotation to ensure that only an ADMIN can call this function
-    @PutMapping
+    @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+
+    //void: This method doesn't return anything
+    //@PathVariable int id : Tells Spring to take the ID from the URL path
+    //@RequestBody Category category: Tells Spring to convert the JSON sent in the request into a Category object
     public void updateCategory(@PathVariable int id, @RequestBody Category category) {
+        // Consistency check that catches mismatched ID when getting category
         if (category.getCategoryId() != id) {
             throw new IllegalArgumentException("Category ID in path must match the Id in the body");
         }
-        // TODO update the category by id
+        // Asks database if there's a category with a particular ID and stores the result in existingCategory
+        Category existingCategory = categoryDao.getById(id);
+
+        // Checks to see if category was found. If its null an error is thrown
+        if (existingCategory == null) {
+            throw new IllegalArgumentException("Category not found with ID: " + id);
+        }
+        categoryDao.update(id, category);
     }
 
-    // TODO add annotation to call this method for a DELETE action - the url path must include the categoryId
-    // TODO add annotation to ensure that only an ADMIN can call this function
+    // Tells Spring that this method handles DELETE requests. {id} is like an address that indicates what will be deleted
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteCategory(@PathVariable int id) {
-        // TODO delete the category by id
+        Category existingCategory = categoryDao.getById(id);
+        if (existingCategory == null) {
+            throw new IllegalArgumentException("Category with ID " + id + " not found.");
+        }
+
+        List<Product> products = productDao.listByCategoryId(id);
+        if (!products.isEmpty()) {
+            throw new IllegalArgumentException("Can't delete category that has no products");
+        }
+        categoryDao.delete(id);
     }
 }
-
